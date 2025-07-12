@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文字落ちパズル（新レイアウト）</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 20px;
+            background-color: #f9f9f9;
+        }
+        .container {
+            padding: 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h2 {
+            text-align: center;
+            margin-top: 0;
+        }
+        #puzzle-grid {
+            display: grid;
+            grid-template-columns: repeat(21, 30px);
+            grid-gap: 2px;
+            border: 2px solid #333;
+            padding: 5px;
+            background-color: #e0e0e0;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        .cell {
+            width: 30px;
+            height: 30px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            border-radius: 3px;
+            transition: all 0.4s ease-in-out;
+        }
+        .pusher {
+            font-size: 24px;
+        }
+        .char-start {
+            background-color: white;
+            border: 1px solid #ccc;
+        }
+        .char-fallen {
+             background-color: #fff2ab;
+             border: 1px solid #f8b400;
+             transform: scale(1.05);
+        }
+        .solid {
+            background-color: #666;
+            border: 1px solid #444;
+        }
+        .empty {
+            background-color: #dcdcdc;
+            border: 1px solid #bbb;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        button {
+            padding: 8px 20px; /* 少し高さを調整 */
+            font-size: 20px; /* アイコンを大きく */
+            line-height: 1; /* 行の高さを調整 */
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #007bff;
+            color: white;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>文字落ちパズル</h2>
+        <div id="puzzle-grid"></div>
+        <div class="controls">
+            <!-- ★変更点: ボタンのテキストを「▶」に変更 -->
+            <button id="dropButton" onclick="dropNextCharacter()">▶</button>
+            <button onclick="setupGrid()">リセット</button>
+        </div>
+    </div>
+
+    <script>
+        // --- パズルの設定 ---
+        const COLS = 21;
+        const ROWS = 6; // 最大の穴の深さ + 文字の行
+
+        const initialChars = [
+            'だ', 'た', 'は', 'ん', 'こ', 'は', 'づ', 'め', 'の', 'も',
+            'の', 'の', 'い', 'え', 'こ'
+        ];
+        // --- 設定ここまで ---
+
+        const gridElement = document.getElementById('puzzle-grid');
+        const dropButton = document.getElementById('dropButton');
+
+        let currentGridState;
+        let charsToDropQueue;
+        let emptyHolesQueue;
+        
+        function createInitialLayout() {
+            const layout = Array.from({ length: ROWS }, () => Array(COLS).fill('S'));
+
+            layout[0][0] = 'P'; 
+            for (let c = 1; c <= 15; c++) {
+                layout[0][c] = 'C';
+            }
+            for (let c = 16; c < COLS; c++) {
+                layout[0][c] = 'E';
+            }
+            
+            const holeDepths = { 16: 1, 17: 4, 18: 2, 19: 5, 20: 3 };
+            for (const colIndex in holeDepths) {
+                const depth = holeDepths[colIndex];
+                for (let r = 1; r <= depth; r++) {
+                    if (r < ROWS) {
+                        layout[r][colIndex] = 'E';
+                    }
+                }
+            }
+            return layout;
+        }
+        
+        function setupGrid() {
+            const layout = createInitialLayout();
+            currentGridState = layout.map(row => [...row]);
+            
+            let charIndex = 0;
+            for (let c = 0; c < COLS; c++) {
+                if (currentGridState[0][c] === 'C') {
+                    currentGridState[0][c] = initialChars[charIndex++];
+                }
+            }
+            
+            charsToDropQueue = [...initialChars].reverse();
+            
+            emptyHolesQueue = [];
+            // ★変更点: 2行目以降(r >= 1)の穴だけをキューに追加
+            for (let c = 0; c < COLS; c++) {
+                for (let r = ROWS - 1; r >= 1; r--) { // rの開始条件を1以上に
+                    if (layout[r][c] === 'E') {
+                        emptyHolesQueue.push({ r, c });
+                    }
+                }
+            }
+            
+            dropButton.disabled = false;
+            updateGridView();
+        }
+
+        function dropNextCharacter() {
+            if (dropButton.disabled) return; // ボタンが無効なら何もしない
+
+            if (charsToDropQueue.length === 0 || emptyHolesQueue.length === 0) {
+                dropButton.disabled = true;
+                return;
+            }
+
+            const charToDrop = charsToDropQueue.shift();
+            const targetHole = emptyHolesQueue.shift();
+            
+            let originalPosFound = false;
+            for (let c = COLS - 1; c >= 0; c--) {
+                if (currentGridState[0][c] === charToDrop) {
+                    currentGridState[0][c] = 'E';
+                    originalPosFound = true;
+                    break; 
+                }
+            }
+
+            currentGridState[targetHole.r][targetHole.c] = charToDrop;
+            updateGridView();
+
+            if (charsToDropQueue.length === 0 || emptyHolesQueue.length === 0) {
+                dropButton.disabled = true;
+            }
+        }
+
+        function updateGridView() {
+            gridElement.innerHTML = '';
+            const layout = createInitialLayout();
+            
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    const cellValue = currentGridState[r][c];
+
+                    if (cellValue === 'S') {
+                        cell.classList.add('solid');
+                    } else if (cellValue === 'E') {
+                        cell.classList.add('empty');
+                    } else if (cellValue === 'P') {
+                        cell.classList.add('pusher');
+                        cell.innerHTML = '&#x1F449;'; // 指の絵文字
+                    } else {
+                        if (layout[r][c] === 'E') {
+                            cell.classList.add('char-fallen');
+                        } else {
+                            cell.classList.add('char-start');
+                        }
+                        cell.textContent = cellValue;
+                    }
+                    gridElement.appendChild(cell);
+                }
+            }
+        }
+
+        // ★追加: キーボードの矢印キーで操作する機能
+        window.addEventListener('keydown', (event) => {
+            if (event.key === 'ArrowRight') {
+                // デフォルトのブラウザ動作（スクロールなど）をキャンセル
+                event.preventDefault();
+                // ボタンをクリックするのと同じ関数を呼び出す
+                dropNextCharacter();
+            }
+        });
+
+        setupGrid();
+    </script>
+
+</body>
+</html>
