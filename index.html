@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>文字落ちパズル</title>
+    <title>文字落ちパズル（新レイアウト）</title>
     <style>
         body {
             font-family: sans-serif;
@@ -179,32 +179,47 @@
                 return;
             }
 
-            const charToDrop = charsToDropQueue.shift();
-            const targetHole = emptyHolesQueue.shift();
+            // ★変更点: 押す人も含めて全体を動かすロジック
             
-            // ★変更点: 文字が落ちた後、残りの文字を右にシフトする
-            let removedCharIndex = -1;
-            // 落ちる文字が元々どこにあったかを探す（右から探す）
-            for (let c = COLS - 1; c >= 1; c--) {
-                if (currentGridState[0][c] === charToDrop) {
-                    removedCharIndex = c;
+            // 1. 盤面の一番右にある文字を探す
+            let lastCharIndex = -1;
+            for (let c = COLS - 1; c >= 0; c--) {
+                const cellValue = currentGridState[0][c];
+                // 'E'(空), 'S'(壁), 'P'(押す人) 以外のものが文字
+                if (cellValue !== 'E' && cellValue !== 'S' && cellValue !== 'P') {
+                    lastCharIndex = c;
                     break;
                 }
             }
 
-            // 元の位置が見つかったら、そこを起点に文字を右にずらす
-            if (removedCharIndex !== -1) {
-                for (let c = removedCharIndex; c > 1; c--) {
-                    currentGridState[0][c] = currentGridState[0][c - 1];
-                }
-                // 押す人の隣を空きマスにする
-                currentGridState[0][1] = 'E';
+            // もし盤面に文字が残っていなければ終了
+            if (lastCharIndex === -1) {
+                dropButton.disabled = true;
+                return;
             }
+            
+            // 2. 押す人の現在の位置を探す
+            const pusherIndex = currentGridState[0].indexOf('P');
 
-            // 穴に文字を落とす
+            // 3. 落とす文字と、落とす先の穴を取得
+            const charToDrop = currentGridState[0][lastCharIndex];
+            const targetHole = emptyHolesQueue.shift();
+            charsToDropQueue.shift(); // 文字キューも同期させる
+
+            // 4. 押す人と残りの文字を、ブロックとして1マス右にずらす
+            for (let c = lastCharIndex - 1; c >= pusherIndex; c--) {
+                currentGridState[0][c + 1] = currentGridState[0][c];
+            }
+            // 押す人が元々いた場所を空にする
+            currentGridState[0][pusherIndex] = 'E';
+
+            // 5. 最初に取得した文字を穴に落とす
             currentGridState[targetHole.r][targetHole.c] = charToDrop;
+            
+            // 6. 画面を更新
             updateGridView();
 
+            // ゲーム終了判定
             if (charsToDropQueue.length === 0 || emptyHolesQueue.length === 0) {
                 dropButton.disabled = true;
             }
@@ -226,7 +241,7 @@
                         cell.classList.add('empty');
                     } else if (cellValue === 'P') {
                         cell.classList.add('pusher');
-                        cell.innerHTML = '&#x1F449;'; // 指の絵文字
+                        cell.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15 8H20V16H15V8Z" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 12H11" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 12C9.10457 12 10 11.1046 10 10C10 8.89543 9.10457 8 8 8C6.89543 8 6 8.89543 6 10C6 11.1046 6.89543 12 8 12Z" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 12V18" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 20L8 18L10 20" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
                     } else {
                         if (layout[r][c] === 'E') {
                             cell.classList.add('char-fallen');
