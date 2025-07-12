@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>文字落ちパズル（新レイアウト）</title>
+    <title>文字落ちパズル</title>
     <style>
         body {
             font-family: sans-serif;
@@ -99,7 +99,6 @@
         <h2>文字落ちパズル</h2>
         <div id="puzzle-grid"></div>
         <div class="controls">
-            <!-- ★変更点: ボタンのテキストを「▶」に変更 -->
             <button id="dropButton" onclick="dropNextCharacter()">▶</button>
             <button onclick="setupGrid()">リセット</button>
         </div>
@@ -111,8 +110,8 @@
         const ROWS = 6; // 最大の穴の深さ + 文字の行
 
         const initialChars = [
-            'だ', 'た', 'は', 'ん', 'こ', 'は', 'づ', 'め', 'の', 'も',
-            'の', 'の', 'い', 'え', 'こ'
+            'だ', 'た', 'は', 'ん', 'こ', 'は', 'づ', 'め', 'も', 'の', 
+            'の', 'い', 'え', 'こ', 'こ'
         ];
         // --- 設定ここまで ---
 
@@ -160,9 +159,8 @@
             charsToDropQueue = [...initialChars].reverse();
             
             emptyHolesQueue = [];
-            // ★変更点: 2行目以降(r >= 1)の穴だけをキューに追加
             for (let c = 0; c < COLS; c++) {
-                for (let r = ROWS - 1; r >= 1; r--) { // rの開始条件を1以上に
+                for (let r = ROWS - 1; r >= 1; r--) {
                     if (layout[r][c] === 'E') {
                         emptyHolesQueue.push({ r, c });
                     }
@@ -174,7 +172,7 @@
         }
 
         function dropNextCharacter() {
-            if (dropButton.disabled) return; // ボタンが無効なら何もしない
+            if (dropButton.disabled) return;
 
             if (charsToDropQueue.length === 0 || emptyHolesQueue.length === 0) {
                 dropButton.disabled = true;
@@ -184,15 +182,26 @@
             const charToDrop = charsToDropQueue.shift();
             const targetHole = emptyHolesQueue.shift();
             
-            let originalPosFound = false;
-            for (let c = COLS - 1; c >= 0; c--) {
+            // ★変更点: 文字が落ちた後、残りの文字を右にシフトする
+            let removedCharIndex = -1;
+            // 落ちる文字が元々どこにあったかを探す（右から探す）
+            for (let c = COLS - 1; c >= 1; c--) {
                 if (currentGridState[0][c] === charToDrop) {
-                    currentGridState[0][c] = 'E';
-                    originalPosFound = true;
-                    break; 
+                    removedCharIndex = c;
+                    break;
                 }
             }
 
+            // 元の位置が見つかったら、そこを起点に文字を右にずらす
+            if (removedCharIndex !== -1) {
+                for (let c = removedCharIndex; c > 1; c--) {
+                    currentGridState[0][c] = currentGridState[0][c - 1];
+                }
+                // 押す人の隣を空きマスにする
+                currentGridState[0][1] = 'E';
+            }
+
+            // 穴に文字を落とす
             currentGridState[targetHole.r][targetHole.c] = charToDrop;
             updateGridView();
 
@@ -231,12 +240,9 @@
             }
         }
 
-        // ★追加: キーボードの矢印キーで操作する機能
         window.addEventListener('keydown', (event) => {
             if (event.key === 'ArrowRight') {
-                // デフォルトのブラウザ動作（スクロールなど）をキャンセル
                 event.preventDefault();
-                // ボタンをクリックするのと同じ関数を呼び出す
                 dropNextCharacter();
             }
         });
